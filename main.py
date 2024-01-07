@@ -1,66 +1,112 @@
-# İçeri Aktarma
+# İçe aktar
 from flask import Flask, render_template,request, redirect
-# Veritabanı kütüphanesini içe aktarma
+# Veri tabanı kitaplığını bağlama
 from flask_sqlalchemy import SQLAlchemy
 
 
 app = Flask(__name__)
-# SQLite ile bağlantı kurma 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gunluk.db'
+# SQLite'ı bağlama
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///diary.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# DB oluşturma
+# Veri tabanı oluşturma
 db = SQLAlchemy(app)
+# Tablo oluşturma
 
-#Görev #1. DB tablosu oluşturma
-
-class Gunluk(db.Model):
-    #Gunlugun numarasi
+class Card(db.Model):
+    # Sütun oluşturma
+    # id
     id = db.Column(db.Integer, primary_key=True)
-    
-    #Gunlugun basligi
+    # Başlık
     title = db.Column(db.String(100), nullable=False)
-    
-    #Gunlugun altbasligi
-    subtitle = db.Column(db.String(100), nullable=False)
-    
-    #Gunlugun yazisi
-    text = db.Column(db.String(400), nullable=False)
+    # Tanım
+    subtitle = db.Column(db.String(300), nullable=False)
+    # Metin
+    text = db.Column(db.Text, nullable=False)
 
+    # Nesnenin ve kimliğin çıktısı
+    def __repr__(self):
+        return f'<Card {self.id}>'
+    
 
+#Ödev #2. Kullanıcı tablosunu oluşturun
+class User(db.Model):
+    # Sütunları oluşturma
+     # kimlik
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # kullanici adimiz
+    username = db.Column(db.String(200), nullable=False)
+    
+    # sifremiz
+    pwd = db.Column(db.String(200), nullable=False)
+    
 
 with app.app_context():
     db.create_all()
 
 
 
+# İçerik sayfasını çalıştırma
+@app.route('/', methods=['GET','POST'])
+def login():
+        error = ''
+        if request.method == 'POST':
+            form_login = request.form['email']
+            form_password = request.form['password']
+            
+            #Ödev #4. yetkilendirmeyi uygulamak
+            users_db = User.query.all()
+            for user in users_db:
+                if form_login == user.username and form_password == user.pwd:
+                    return redirect('/index')
+
+            else:
+                error = 'Incorrect username or password'
+                return render_template('login.html', error=error)
+            
+        else:
+            return render_template('login.html')
+
+
+
+@app.route('/reg', methods=['GET','POST'])
+def reg():
+    if request.method == 'POST':
+        login= request.form['email']
+        password = request.form['password']
+        
+        #Ödev #3 Kullanıcı verilerinin veri tabanına kaydedilmesini sağlayın
+        user = User(username=login, pwd=password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        return redirect('/')
+    
+    else:    
+        return render_template('registration.html')
 
 
 # İçerik sayfasını çalıştırma
-@app.route('/')
+@app.route('/index')
 def index():
-    # DB nesnelerini görüntüleme
-    # Görev #2. DB'deki nesneleri index.html'de görüntülem
-    gunlukler = Gunluk.query.order_by(Gunluk.id).all()
+    # Veri tabanı girişlerini görüntüleme
+    cards = Card.query.order_by(Card.id).all()
+    return render_template('index.html', cards=cards)
 
-    return render_template('index.html',
-                           #kartlar = kartlar
-                            gunlukler=gunlukler
-                           )
-
-# Kartla sayfayı çalıştırma
+# Kayıt sayfasını çalıştırma
 @app.route('/card/<int:id>')
 def card(id):
-    # Görev #2. Id'ye göre doğru kartı görüntüleme
-    gunluk = Gunluk.query.get(id)
+    card = Card.query.get(id)
 
-    return render_template('card.html', gunluk=gunluk)
+    return render_template('card.html', card=card)
 
-# Sayfayı çalıştırma ve kart oluşturma
+# Giriş oluşturma sayfasını çalıştırma
 @app.route('/create')
 def create():
     return render_template('create_card.html')
 
-# Kart formu
+# Giriş formu
 @app.route('/form_create', methods=['GET','POST'])
 def form_create():
     if request.method == 'POST':
@@ -68,17 +114,17 @@ def form_create():
         subtitle =  request.form['subtitle']
         text =  request.form['text']
 
-        # Görev #2. Verileri DB'de depolamak için bir yol oluşturma
-        gunluk = Gunluk(title=title, subtitle=subtitle, text=text)
-        db.session.add(gunluk)
+        # Veri tabanına gönderilecek bir nesne oluşturma
+        card = Card(title=title, subtitle=subtitle, text=text)
+
+        db.session.add(card)
         db.session.commit()
-
-
-
-
-        return redirect('/')
+        return redirect('/index')
     else:
         return render_template('create_card.html')
+
+
+
 
 
 if __name__ == "__main__":
